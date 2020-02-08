@@ -2,21 +2,8 @@
   "name": "fstv-monitoring",
   "version": "1.0.2",
   "description": "Real-time monitoring dashboard for nginx rtmp module.",
-  "author": "Fiftysoft",
-  "homepage": "https://github.com/fiftysoft/nginx-rtmp-monitoring",
-  "keywords": [
-    "fstv",
-    "dashboard",
-    "monitoring",
-    "fstv monitoring",
-    "fiftysoft"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/fiftysoft/nginx-rtmp-monitoring.git"
-  },
-  "bugs": "https://github.com/fiftysoft/nginx-rtmp-monitoring/issues",
-  "contributors": "https://github.com/fiftysoft/nginx-rtmp-monitoring/graphs/contributors",
+  "author": "kev",
+  "homepage": "https://github.com/chocolatemelt/nginx-rtmp-monitoring",
   "license": "MIT",
   "engines": {
     "node": "~0.10.0 || ~0.12.0 || ^4.2.0"
