@@ -106,3 +106,6 @@ dist
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 
+config.json
+valid_keys.json
+
