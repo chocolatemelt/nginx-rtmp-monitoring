@@ -4,6 +4,7 @@ var request = require('request');
 var bodyParser = require('body-parser');
 var parseString = require('xml2js').parseString;
 var config = require('./config.json');
+var valid_keys = require('./valid_keys.json');
 var language = require('./language/'+config.language+'.json');
 var app = express();
 app.use(express.static('public'));
@@ -17,131 +18,147 @@ app.engine('html', swig.renderFile);
 app.set('view engine', 'html');
 app.set('views', __dirname + '/template/');
 
-
 function customHeaders( req, res, next ){
-    app.disable( 'x-powered-by' );
-    res.setHeader( 'X-Powered-By', "fstv monitoring "+config.version );
-    next()
+  app.disable( 'x-powered-by' );
+  res.setHeader( 'X-Powered-By', "fstv monitoring "+config.version );
+  next()
 }
 
 app.use(customHeaders);
 
 app.use(session({
-    secret: config.session_secret_key,
-    resave: true,
-    saveUninitialized: true
+  secret: config.session_secret_key,
+  resave: true,
+  saveUninitialized: true
 }));
 
 var auth = function (req, res, next) {
-    if (req.session && req.session.user === "fstn" && req.session.admin) {
-        return next();
-    }
-    else {
-        res.redirect("/login");
-    }
+  if (req.session && req.session.user === "fstn" && req.session.admin) {
+    return next();
+  }
+  else {
+    res.redirect("/login");
+  }
 };
 
 app.get('/logout', function (req, res) {
-    req.session.destroy();
-    res.redirect("/login");
+  req.session.destroy();
+  res.redirect("/login");
 });
 
 app.post('/login', function (req, res) {
-    if (!req.body.username || !req.body.password) {
-        return res.redirect("/login?error=empty");
-    }
+  if (!req.body.username || !req.body.password) {
+    return res.redirect("/login?error=empty");
+  }
 
-    if (req.body.username === config.username && req.body.password === config.password) {
-        req.session.user = "fstn";
-        req.session.admin = true;
-        return res.redirect("/");
-    }
-    return res.redirect("/login?error=wrong");
+  if (req.body.username === config.username && req.body.password === config.password) {
+    req.session.user = "fstn";
+    req.session.admin = true;
+    return res.redirect("/");
+  }
+  return res.redirect("/login?error=wrong");
 });
 
 app.get('/login', function (req, res) {
-    res.render(config.login_template, {
-        title: config.site_title,
-        language: language,
-        error: req.query.error
-    });
+  res.render(config.login_template, {
+    title: config.site_title,
+    language: language,
+    error: req.query.error
+  });
 });
 
 app.get('/',auth,function(req,res){
-   res.render(config.template,{
-        title: config.site_title,
-        language: language,
-        version:config.version,
-        stream_server:config.rtmp_server_stream_url,
-        control_server:config.rtmp_server_control_url
-   });
+  res.render(config.template,{
+    title: config.site_title,
+    language: language,
+    version:config.version,
+    stream_server:config.rtmp_server_stream_url,
+    control_server:config.rtmp_server_control_url
+  });
+});
+
+app.post('/on_publish', function(req, res) {
+  const key = req.body.name;
+  if(valid_keys[key]) {
+    console.log(`${key} connected`);
+    res.redirect(302, valid_keys[key]);
+  } else {
+    console.log('error: wrong key supplied', key);
+    res.status(403).send('Bad Request');
+  }
+});
+
+app.post('/on_publish_done', function(req, res) {
+  const key = req.body.name;
+  console.log(`${key} disconnected`);
+  res.send('OK');
 });
 
 app.get('*', function(req, res){
-    res.redirect('/');
+  res.redirect('/');
 });
 
 function cpuAverage() {
-    var totalIdle = 0, totalTick = 0;
-    var cpus = os.cpus();
-    for(var i = 0, len = cpus.length; i < len; i++) {
-        var cpu = cpus[i];
-        for(type in cpu.times) {
-            totalTick += cpu.times[type];
-        }
-        totalIdle += cpu.times.idle;
+  var totalIdle = 0, totalTick = 0;
+  var cpus = os.cpus();
+  for(var i = 0, len = cpus.length; i < len; i++) {
+    var cpu = cpus[i];
+    for(type in cpu.times) {
+      totalTick += cpu.times[type];
     }
-    return {idle: totalIdle / cpus.length,  total: totalTick / cpus.length};
+    totalIdle += cpu.times.idle;
+  }
+  return {idle: totalIdle / cpus.length,  total: totalTick / cpus.length};
 }
 var startMeasure = cpuAverage();
 
 
 setInterval(function(){
 
-    setTimeout(function() {
-        var endMeasure = cpuAverage();
-        var idleDifference = endMeasure.idle - startMeasure.idle;
-        var totalDifference = endMeasure.total - startMeasure.total;
-        var percentageCPU = 100 - ~~(100 * idleDifference / totalDifference);
-        var spawn = require('child_process').spawn;
-        var prc = spawn('free',  []);
-        var used_memory = 0;
-        prc.stdout.setEncoding('utf8');
-        prc.stdout.on('data', function (data) {
-            var str = data.toString();
-            var lines = str.split(/\n/g);
-            for(var i = 0; i < lines.length; i++) {
-                lines[i] = lines[i].split(/\s+/);
-            }
-            used_memory = lines[1][2];
-            io.emit('server', {
-                used_cpu:percentageCPU,
-                used_memory:used_memory
-            });
-        });
-    }, 100);
+  setTimeout(function() {
+    var endMeasure = cpuAverage();
+    var idleDifference = endMeasure.idle - startMeasure.idle;
+    var totalDifference = endMeasure.total - startMeasure.total;
+    var percentageCPU = 100 - ~~(100 * idleDifference / totalDifference);
+    var spawn = require('child_process').spawn;
+    var prc = spawn('free',  []);
+    var used_memory = 0;
+    prc.stdout.setEncoding('utf8');
+    prc.stdout.on('data', function (data) {
+      var str = data.toString();
+      var lines = str.split(/\n/g);
+      for(var i = 0; i < lines.length; i++) {
+        lines[i] = lines[i].split(/\s+/);
+      }
+      used_memory = lines[1][2];
+      io.emit('server', {
+        used_cpu:percentageCPU,
+        used_memory:used_memory
+      });
+    });
+  }, 100);
 
-    request.get(config.rtmp_server_url,{timeout:config.rtmp_server_timeout},function(error, meta, xml){
+  request.get(config.rtmp_server_url,{timeout:config.rtmp_server_timeout},function(error, meta, xml){
 
     if(error) {
-        io.emit('error', {"error":true});
+      io.emit('error', {"error":true});
     }
 
     parseString(xml,function (err, result) {
 
-    	if(err != null)
-    	{
-    		io.emit('error', {"error":true});
-    	}else{
-    		io.emit('error', {"error":false});
-    	}
+      if(err != null)
+      {
+        io.emit('error', {"error":true});
+      }else{
+        io.emit('error', {"error":false});
+      }
 
-        if(err != null)
-        {
-            io.emit('statistics', result);
-        }else{
-            io.emit('statistics', result.rtmp);
-        }
+      if(err != null)
+      {
+        io.emit('statistics', result);
+      }else{
+        io.emit('statistics', result.rtmp);
+      }
 
     });
 
